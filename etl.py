@@ -11,13 +11,14 @@ TICKERS = ["EPOL", "WIG20.WA", "PLN=X", "EURPLN=X", "SPY"]
 REF_DATE = "2023-10-10" # YYYY-mm-dd format required
 
 #influxDB cfg
-token = "k-iLAgyYnB8wDbTO5NXKeXw0Db3EQjHpwFeeCEVdCKo7pDrAzCOExEqj1JaarmkVDO7chKj-2KEudwwzPm0Zhg=="
-org = "pairview"
-url = "http://localhost:8086"
+with open("api.key") as f:
+    TOKEN = f.readline()
+ORG = "pairview"
+URL = "http://localhost:8086"
 
 bucket="demo1"
 
-client = influxdb_client.InfluxDBClient(url=url, token=token, org=org)
+client = influxdb_client.InfluxDBClient(url=url, token=TOKEN, org=org)
 influx_writer = client.write_api()
 
 today = date.today()

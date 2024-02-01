@@ -18,7 +18,7 @@ URL = "http://localhost:8086"
 
 bucket="demo1"
 
-client = influxdb_client.InfluxDBClient(url=url, token=TOKEN, org=org)
+client = influxdb_client.InfluxDBClient(url=URL, token=TOKEN, org=ORG)
 influx_writer = client.write_api()
 
 today = date.today()
@@ -39,7 +39,7 @@ for ticker in TICKERS:
 
 price_history_payload = []
 
-message = {
+message_template = {
     "measurement" : "ask prices",
     "tags" : {},
     "fields" : {}
@@ -47,27 +47,27 @@ message = {
 
 # historical-absolute values
 for index, row in hist_quotas.iterrows():
-    point_entry = deepcopy(message)
+    point_entry = deepcopy(message_template)
     for ticker in TICKERS:
         point_entry['fields'][ticker] = row[ticker]
     point_entry['time'] = row['Timestamp']
     price_history_payload.append(point_entry)
 
 # historical-relative values
-message["measurement"] = "change vs ref"
+message_template["measurement"] = "change vs ref"
 for index, row in hist_quotas.iterrows():
-    point_entry = deepcopy(message)
+    point_entry = deepcopy(message_template)
     for ticker in TICKERS:
         point_entry['fields'][ticker] = row[f"{ticker}_ref_chg"]
     point_entry['time'] = row['Timestamp']
     price_history_payload.append(point_entry)
 
-influx_writer.write(bucket, org, price_history_payload, write_precision='s')
+influx_writer.write(bucket, ORG, price_history_payload, write_precision='s')
 time.sleep(5)
 print("historical data ready")
 
 # pooling
-message["tags"] = {"fetched_live" : True}
+message_template["tags"] = {"fetched_live" : True}
 
 while LIVE_POOLING:
 
@@ -77,17 +77,17 @@ while LIVE_POOLING:
         ask = yf.Ticker(ticker).info['ask']
 
         # live-absolute values
-        point_entry = deepcopy(message)
+        point_entry = deepcopy(message_template)
         point_entry["measurement"] = "ask prices"
         point_entry["fields"][ticker] = ask
         live_payload.append(point_entry)
 
         # live-relative values
-        point_entry = deepcopy(message)
+        point_entry = deepcopy(message_template)
         point_entry["measurement"] = "change vs ref"
         point_entry["fields"][ticker] = ask / ref_prices[ticker]
         live_payload.append(point_entry)
         
-    influx_writer.write(bucket, org, live_payload, write_precision='s')
+    influx_writer.write(bucket, ORG, live_payload, write_precision='s')
     print(f"Latest data fetched: {datetime.now()}", end="\r")
     time.sleep(10)

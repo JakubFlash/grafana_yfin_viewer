@@ -30,3 +30,5 @@ populate the following constant variables
 * `ORG` : InfluxDB organization name
 * `URL` : InfluxDB URL (leave clocalhost:8086 if default unchanged)
 
+## Troubleshooting
+* Only currencies displayed: make sure the stock market was open on your reference date.

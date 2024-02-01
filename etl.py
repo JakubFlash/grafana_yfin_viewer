@@ -7,8 +7,8 @@ from influxdb_client import InfluxDBClient
 from copy import deepcopy
 
 LIVE_POOLING = True
-tickers = ["EPOL", "WIG20.WA", "PLN=X", "EURPLN=X", "SPY"]
-ref_date = "2023-10-10" # YYYY-mm-dd format required
+TICKERS = ["EPOL", "WIG20.WA", "PLN=X", "EURPLN=X", "SPY"]
+REF_DATE = "2023-10-10" # YYYY-mm-dd format required
 
 #influxDB cfg
 token = "k-iLAgyYnB8wDbTO5NXKeXw0Db3EQjHpwFeeCEVdCKo7pDrAzCOExEqj1JaarmkVDO7chKj-2KEudwwzPm0Zhg=="
@@ -21,19 +21,19 @@ client = influxdb_client.InfluxDBClient(url=url, token=token, org=org)
 influx_writer = client.write_api()
 
 today = date.today()
-gap = today - date.fromisoformat(ref_date)
+gap = today - date.fromisoformat(REF_DATE)
 origin_d = today - 2*gap
 fetch_start_date = origin_d.strftime('%Y-%m-%d')
 
-hist_quotas = yf.download(tickers, interval = '1h', start=fetch_start_date)
+hist_quotas = yf.download(TICKERS, interval = '1h', start=fetch_start_date)
 hist_quotas = hist_quotas['Close']
 hist_quotas = hist_quotas.reset_index()
 hist_quotas['Timestamp'] = (hist_quotas['Datetime'] - pd.Timestamp("1970-01-01 00:00 +00:00")) // pd.Timedelta("1s")
 
-ref_prices = hist_quotas[hist_quotas["Datetime"].dt.round('d') == ref_date]
+ref_prices = hist_quotas[hist_quotas["Datetime"].dt.round('d') == REF_DATE]
 ref_prices = ref_prices.mean()
 
-for ticker in tickers:
+for ticker in TICKERS:
     hist_quotas[f"{ticker}_ref_chg"] = hist_quotas[ticker] / ref_prices[ticker]
 
 price_history_payload = []
@@ -47,7 +47,7 @@ message = {
 # historical-absolute values
 for index, row in hist_quotas.iterrows():
     point_entry = deepcopy(message)
-    for ticker in tickers:
+    for ticker in TICKERS:
         point_entry['fields'][ticker] = row[ticker]
     point_entry['time'] = row['Timestamp']
     price_history_payload.append(point_entry)
@@ -56,7 +56,7 @@ for index, row in hist_quotas.iterrows():
 message["measurement"] = "change vs ref"
 for index, row in hist_quotas.iterrows():
     point_entry = deepcopy(message)
-    for ticker in tickers:
+    for ticker in TICKERS:
         point_entry['fields'][ticker] = row[f"{ticker}_ref_chg"]
     point_entry['time'] = row['Timestamp']
     price_history_payload.append(point_entry)
@@ -71,7 +71,7 @@ message["tags"] = {"fetched_live" : True}
 while LIVE_POOLING:
 
     live_payload = []
-    for ticker in tickers:
+    for ticker in TICKERS:
 
         ask = yf.Ticker(ticker).info['ask']
 

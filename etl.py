@@ -2,19 +2,20 @@
 import influxdb_client, os, time
 import pandas as pd
 import yfinance as yf
-from datetime import date
+from datetime import date, datetime
 from influxdb_client import InfluxDBClient
 from copy import deepcopy
 
-LIVE_POOLING = False
-tickers = ["EPOL", "WIG20.WA", "PLN=X", "EURPLN=X"]
+LIVE_POOLING = True
+tickers = ["EPOL", "WIG20.WA", "PLN=X", "EURPLN=X", "SPY"]
 ref_date = "2023-10-10" # YYYY-mm-dd format required
 
 #influxDB cfg
 token = "k-iLAgyYnB8wDbTO5NXKeXw0Db3EQjHpwFeeCEVdCKo7pDrAzCOExEqj1JaarmkVDO7chKj-2KEudwwzPm0Zhg=="
 org = "pairview"
 url = "http://localhost:8086"
-bucket="testo8"
+
+bucket="demo1"
 
 client = influxdb_client.InfluxDBClient(url=url, token=token, org=org)
 influx_writer = client.write_api()
@@ -42,39 +43,50 @@ message = {
     "tags" : {},
     "fields" : {}
 }
-# absolute values
+
+# historical-absolute values
 for index, row in hist_quotas.iterrows():
-    point_entry = dict(message)
+    point_entry = deepcopy(message)
     for ticker in tickers:
         point_entry['fields'][ticker] = row[ticker]
     point_entry['time'] = row['Timestamp']
-    price_history_payload.append(deepcopy(point_entry))
+    price_history_payload.append(point_entry)
 
-message = {
-    "measurement" : "change vs ref",
-    "tags" : {},
-    "fields" : {}
-}
-# relative values
+# historical-relative values
+message["measurement"] = "change vs ref"
 for index, row in hist_quotas.iterrows():
-    point_entry = dict(message)
+    point_entry = deepcopy(message)
     for ticker in tickers:
         point_entry['fields'][ticker] = row[f"{ticker}_ref_chg"]
     point_entry['time'] = row['Timestamp']
-    price_history_payload.append(deepcopy(point_entry))
+    price_history_payload.append(point_entry)
 
 influx_writer.write(bucket, org, price_history_payload, write_precision='s')
 time.sleep(5)
 print("historical data ready")
 
 # pooling
+message["tags"] = {"fetched_live" : True}
+
 while LIVE_POOLING:
 
-    for pair in tickers:
+    live_payload = []
+    for ticker in tickers:
 
-        tick = yf.Ticker(pair) #todo single request (move out of loop)
-        ask = tick.info['ask']
-        message["fields"][pair + '_ask'] = ask
+        ask = yf.Ticker(ticker).info['ask']
 
-    influx_writer.write(bucket, org, message)
+        # live-absolute values
+        point_entry = deepcopy(message)
+        point_entry["measurement"] = "ask prices"
+        point_entry["fields"][ticker] = ask
+        live_payload.append(point_entry)
+
+        # live-relative values
+        point_entry = deepcopy(message)
+        point_entry["measurement"] = "change vs ref"
+        point_entry["fields"][ticker] = ask / ref_prices[ticker]
+        live_payload.append(point_entry)
+        
+    influx_writer.write(bucket, org, live_payload, write_precision='s')
+    print(f"Latest data fetched: {datetime.now()}", end="\r")
     time.sleep(10)
